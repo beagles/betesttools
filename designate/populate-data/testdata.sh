@@ -32,6 +32,19 @@ PROJECTS=(
 )
 
 # ============================================================================
+# User Definitions
+# ============================================================================
+
+# Users: username:password:project_name
+# Each user is assigned the admin role on their project
+USERS=(
+    "project1-user:password1:project1"
+    "project2-user:password2:project2"
+    "project3-user:password3:project3"
+    "admin-user:adminpass:admin-project"
+)
+
+# ============================================================================
 # Quota Definitions
 # ============================================================================
 

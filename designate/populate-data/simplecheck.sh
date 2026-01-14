@@ -137,6 +137,41 @@ check_projects() {
 }
 
 # ============================================================================
+# User and Role Verification
+# ============================================================================
+
+check_users() {
+    print_section "Checking Users and Role Assignments"
+
+    local existing_users=$($os user list -c Name -f value 2>/dev/null || echo "")
+
+    for user_info in "${USERS[@]}"; do
+        IFS=':' read -r username password project_name <<< "$user_info"
+
+        # Check if user exists
+        if resource_exists "$existing_users" "$username"; then
+            print_found "User exists: $username"
+            count_found "users"
+
+            # Check if admin role is assigned
+            local role_assignments=$($os role assignment list --user "$username" --project "$project_name" --names -c Role -f value 2>/dev/null || echo "")
+
+            if resource_exists "$role_assignments" "admin"; then
+                print_found "Admin role assigned: $username on $project_name"
+                count_found "role_assignments"
+            else
+                print_missing "Admin role not assigned: $username on $project_name"
+                count_missing "role_assignments"
+            fi
+        else
+            print_missing "User missing: $username"
+            count_missing "users"
+            count_missing "role_assignments"
+        fi
+    done
+}
+
+# ============================================================================
 # Quota Verification
 # ============================================================================
 
@@ -513,6 +548,7 @@ main() {
     # Execute all verification functions
     check_tlds
     check_projects
+    check_users
     check_quotas
     check_blacklists
     check_zones

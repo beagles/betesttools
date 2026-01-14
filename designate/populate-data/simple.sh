@@ -26,7 +26,7 @@ source "$SCRIPT_DIR/testdata.sh"
 # Configuration
 # ============================================================================
 
-os=openstack
+os="ssh -i ~/install_yamls/out/edpm/ansibleee-ssh-key-id_rsa root@192.168.122.100 OS_CLOUD=standalone openstack"
 VERBOSE=${VERBOSE:-false}
 
 # Color codes for output
@@ -138,6 +138,56 @@ create_projects() {
                 count_created "projects"
             else
                 print_error "Failed to create project: $project_name"
+            fi
+        fi
+    done
+}
+
+# ============================================================================
+# User Creation and Role Assignment
+# ============================================================================
+
+create_users() {
+    print_section "Creating Users and Assigning Roles"
+
+    local existing_users=$($os user list -c Name -f value 2>/dev/null || echo "")
+
+    for user_info in "${USERS[@]}"; do
+        IFS=':' read -r username password project_name <<< "$user_info"
+
+        local project_id=$(get_project_id "$project_name")
+        if [[ -z "$project_id" ]]; then
+            print_warning "Project not found, skipping user: $project_name"
+            continue
+        fi
+
+        # Create user if it doesn't exist
+        if resource_exists "$existing_users" "$username"; then
+            print_info "User already exists: $username"
+            count_skipped "users"
+        else
+            if $os user create --project "$project_name" --password "$password" "$username" >/dev/null 2>&1; then
+                print_success "Created user: $username (project: $project_name)"
+                count_created "users"
+            else
+                print_error "Failed to create user: $username"
+                continue
+            fi
+        fi
+
+        # Assign admin role to user on their project
+        # Check if role assignment already exists
+        local role_assignments=$($os role assignment list --user "$username" --project "$project_name" --names -c Role -f value 2>/dev/null || echo "")
+
+        if resource_exists "$role_assignments" "admin"; then
+            print_info "Admin role already assigned: $username on $project_name"
+            count_skipped "role_assignments"
+        else
+            if $os role add --project "$project_name" --user "$username" admin >/dev/null 2>&1; then
+                print_success "Assigned admin role: $username on $project_name"
+                count_created "role_assignments"
+            else
+                print_error "Failed to assign admin role: $username on $project_name"
             fi
         fi
     done
@@ -546,6 +596,7 @@ main() {
     # Execute all creation functions
     create_tlds
     create_projects
+    create_users
     set_quotas
     create_blacklists
     create_zones

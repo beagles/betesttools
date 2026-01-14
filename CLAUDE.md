@@ -38,6 +38,7 @@ The `testdata.sh` file contains bash arrays defining:
 
 - **TLDs**: 8 top-level domains (com, org, net, edu, io, dev, cloud, local)
 - **Projects**: 4 OpenStack projects with descriptions
+- **Users**: 4 users (one per project) with passwords and project assignments
 - **Quotas**: Quota configurations for each project
 - **Blacklists**: 4 regex patterns for blocking zone names
 - **Zones**: 12 DNS zones with project, email, TTL, and description
@@ -88,18 +89,23 @@ The script creates the following resources:
    - `project2`: Secondary project with restricted quotas
    - `project3`: Zone sharing recipient project
    - `admin-project`: Administrative project with elevated quotas
-3. **Quotas (4 sets)**: Different quota configurations per project for testing limits
-4. **Blacklists (4)**: Regex patterns to block zone creation (spam, test123, blocked.*, *.invalid)
-5. **Zones (12)**: DNS zones distributed across projects with varying TTLs
-6. **Zone Shares (5)**: Shared zones between projects for multi-tenant testing
-7. **Recordsets (50+)**: Multiple DNS records per zone including:
+3. **Users (4)**: One user per project with admin role assigned:
+   - `project1-user`: User for project1 with admin role
+   - `project2-user`: User for project2 with admin role
+   - `project3-user`: User for project3 with admin role
+   - `admin-user`: User for admin-project with admin role
+4. **Quotas (4 sets)**: Different quota configurations per project for testing limits
+5. **Blacklists (4)**: Regex patterns to block zone creation (spam, test123, blocked.*, *.invalid)
+6. **Zones (12)**: DNS zones distributed across projects with varying TTLs
+7. **Zone Shares (5)**: Shared zones between projects for multi-tenant testing
+8. **Recordsets (50+)**: Multiple DNS records per zone including:
    - A records (17): IPv4 addresses, including multi-value round-robin records
    - AAAA records (6): IPv6 addresses
    - CNAME records (8): Aliases and canonical names
    - MX records (4): Mail exchange records with priorities
    - TXT records (6): SPF, DMARC, and verification records
    - SRV records (4): Service discovery records
-8. **PTR Records**: Reverse DNS for Neutron floating IPs (when available)
+9. **PTR Records**: Reverse DNS for Neutron floating IPs (when available)
 
 #### Usage
 
@@ -162,18 +168,20 @@ The script verifies the presence of:
 
 1. **TLDs (8)**: All expected top-level domains
 2. **Projects (4)**: All test projects
-3. **Quotas (4 sets)**: Validates quota configurations match expected values
-4. **Blacklists (4)**: All regex patterns
-5. **Zones (12)**: All DNS zones across projects
-6. **Zone Shares (5)**: All shared zone configurations
-7. **Recordsets (Sample)**: Representative sample of each record type:
+3. **Users (4)**: All project users
+4. **Role Assignments (4)**: Validates admin role is assigned to each user on their project
+5. **Quotas (4 sets)**: Validates quota configurations match expected values
+6. **Blacklists (4)**: All regex patterns
+7. **Zones (12)**: All DNS zones across projects
+8. **Zone Shares (5)**: All shared zone configurations
+9. **Recordsets (Sample)**: Representative sample of each record type:
    - A records (5 samples)
    - AAAA records (3 samples)
    - CNAME records (3 samples)
    - MX records (3 zones)
    - TXT records (3 samples)
    - SRV records (3 samples)
-8. **PTR Records**: Lists any existing PTR records
+10. **PTR Records**: Lists any existing PTR records
 
 #### Usage
 
