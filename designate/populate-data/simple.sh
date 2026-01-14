@@ -26,7 +26,7 @@ source "$SCRIPT_DIR/testdata.sh"
 # Configuration
 # ============================================================================
 
-os="ssh -i ~/install_yamls/out/edpm/ansibleee-ssh-key-id_rsa root@192.168.122.100 OS_CLOUD=standalone openstack"
+os=openstack
 VERBOSE=${VERBOSE:-false}
 
 # Color codes for output
