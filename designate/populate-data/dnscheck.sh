@@ -21,6 +21,14 @@
 set -e  # Exit on error
 
 # ============================================================================
+# Load Test Data
+# ============================================================================
+
+# Source common test data definitions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/testdata.sh"
+
+# ============================================================================
 # Configuration
 # ============================================================================
 
@@ -156,22 +164,23 @@ check_a_records() {
 
     print_info "Checking A records..."
 
-    # A records from simple.sh with expected values
-    check_record_value "$dns_server" "www.example.com" "A" "A record (multi-value)" "192.168.1.10" "192.168.1.11"
-    check_record_value "$dns_server" "web.example.com" "A" "A record (multi-value)" "10.0.0.10" "10.0.0.11" "10.0.0.12"
-    check_record_value "$dns_server" "db1.example.com" "A" "A record" "192.168.2.20"
-    check_record_value "$dns_server" "db2.example.com" "A" "A record" "192.168.2.21"
-    check_record_value "$dns_server" "api.example.com" "A" "A record (multi-value)" "172.16.0.30" "172.16.0.31"
-    check_record_value "$dns_server" "www.test.org" "A" "A record" "203.0.113.10"
-    check_record_value "$dns_server" "app.test.org" "A" "A record (multi-value)" "203.0.113.20" "203.0.113.21"
-    check_record_value "$dns_server" "cache.test.org" "A" "A record (multi-value)" "10.1.1.50" "10.1.1.51"
-    check_record_value "$dns_server" "v1.api.dev" "A" "A record" "192.168.10.100"
-    check_record_value "$dns_server" "v2.api.dev" "A" "A record" "192.168.10.101"
-    check_record_value "$dns_server" "staging.api.dev" "A" "A record" "192.168.10.200"
-    check_record_value "$dns_server" "frontend.webapp.io" "A" "A record (multi-value)" "198.51.100.10" "198.51.100.11"
-    check_record_value "$dns_server" "backend.webapp.io" "A" "A record" "198.51.100.20"
-    check_record_value "$dns_server" "api.service.net" "A" "A record" "172.20.0.10"
-    check_record_value "$dns_server" "web.service.net" "A" "A record (multi-value)" "172.20.0.20" "172.20.0.21"
+    # Check all A records from testdata.sh
+    for record_info in "${A_RECORDS[@]}"; do
+        IFS=':' read -r zone name ip1 ip2 ip3 <<< "$record_info"
+        local fqdn="${name}.${zone}"
+
+        # Build expected values array
+        local expected_values=()
+        [[ -n "$ip1" ]] && expected_values+=("$ip1")
+        [[ -n "$ip2" ]] && expected_values+=("$ip2")
+        [[ -n "$ip3" ]] && expected_values+=("$ip3")
+
+        # Determine description based on number of values
+        local desc="A record"
+        [[ ${#expected_values[@]} -gt 1 ]] && desc="A record (multi-value)"
+
+        check_record_value "$dns_server" "$fqdn" "A" "$desc" "${expected_values[@]}"
+    done
 }
 
 check_aaaa_records() {
@@ -179,13 +188,22 @@ check_aaaa_records() {
 
     print_info "Checking AAAA records..."
 
-    # AAAA records from simple.sh with expected IPv6 values
-    check_record_value "$dns_server" "www.example.com" "AAAA" "AAAA record (multi-value)" "2001:db8::1" "2001:db8::2"
-    check_record_value "$dns_server" "web.example.com" "AAAA" "AAAA record" "2001:db8::10"
-    check_record_value "$dns_server" "www.test.org" "AAAA" "AAAA record" "2001:db8:1::1"
-    check_record_value "$dns_server" "v1.api.dev" "AAAA" "AAAA record" "2001:db8:2::100"
-    check_record_value "$dns_server" "frontend.webapp.io" "AAAA" "AAAA record (multi-value)" "2001:db8:3::10" "2001:db8:3::11"
-    check_record_value "$dns_server" "api.service.net" "AAAA" "AAAA record" "2001:db8:4::10"
+    # Check all AAAA records from testdata.sh
+    for record_info in "${AAAA_RECORDS[@]}"; do
+        IFS=':' read -r zone name ip1 ip2 <<< "$record_info"
+        local fqdn="${name}.${zone}"
+
+        # Build expected values array
+        local expected_values=()
+        [[ -n "$ip1" ]] && expected_values+=("$ip1")
+        [[ -n "$ip2" ]] && expected_values+=("$ip2")
+
+        # Determine description based on number of values
+        local desc="AAAA record"
+        [[ ${#expected_values[@]} -gt 1 ]] && desc="AAAA record (multi-value)"
+
+        check_record_value "$dns_server" "$fqdn" "AAAA" "$desc" "${expected_values[@]}"
+    done
 }
 
 check_cname_records() {
@@ -193,15 +211,13 @@ check_cname_records() {
 
     print_info "Checking CNAME records..."
 
-    # CNAME records from simple.sh with expected targets
-    check_record_value "$dns_server" "blog.example.com" "CNAME" "CNAME record" "www.example.com."
-    check_record_value "$dns_server" "shop.example.com" "CNAME" "CNAME record" "web.example.com."
-    check_record_value "$dns_server" "docs.example.com" "CNAME" "CNAME record" "www.example.com."
-    check_record_value "$dns_server" "mail.test.org" "CNAME" "CNAME record" "www.test.org."
-    check_record_value "$dns_server" "ftp.test.org" "CNAME" "CNAME record" "www.test.org."
-    check_record_value "$dns_server" "latest.api.dev" "CNAME" "CNAME record" "v2.api.dev."
-    check_record_value "$dns_server" "app.webapp.io" "CNAME" "CNAME record" "frontend.webapp.io."
-    check_record_value "$dns_server" "portal.service.net" "CNAME" "CNAME record" "web.service.net."
+    # Check all CNAME records from testdata.sh
+    for record_info in "${CNAME_RECORDS[@]}"; do
+        IFS=':' read -r zone name target <<< "$record_info"
+        local fqdn="${name}.${zone}"
+
+        check_record_value "$dns_server" "$fqdn" "CNAME" "CNAME record" "$target"
+    done
 }
 
 check_mx_records() {
@@ -209,11 +225,21 @@ check_mx_records() {
 
     print_info "Checking MX records..."
 
-    # MX records from simple.sh (zone apex) with expected priorities and hosts
-    check_record_value "$dns_server" "example.com" "MX" "MX record (multi-value)" "10 mail1.example.com." "20 mail2.example.com."
-    check_record_value "$dns_server" "test.org" "MX" "MX record (multi-value)" "10 mx1.test.org." "20 mx2.test.org."
-    check_record_value "$dns_server" "webapp.io" "MX" "MX record" "5 mail.webapp.io."
-    check_record_value "$dns_server" "partner.com" "MX" "MX record" "10 mail.partner.com."
+    # Check all MX records from testdata.sh
+    for record_info in "${MX_RECORDS[@]}"; do
+        IFS=':' read -r zone pri1 host1 pri2 host2 <<< "$record_info"
+
+        # Build expected values array
+        local expected_values=()
+        [[ -n "$pri1" && -n "$host1" ]] && expected_values+=("$pri1 $host1")
+        [[ -n "$pri2" && -n "$host2" ]] && expected_values+=("$pri2 $host2")
+
+        # Determine description based on number of values
+        local desc="MX record"
+        [[ ${#expected_values[@]} -gt 1 ]] && desc="MX record (multi-value)"
+
+        check_record_value "$dns_server" "$zone" "MX" "$desc" "${expected_values[@]}"
+    done
 }
 
 check_txt_records() {
@@ -221,12 +247,26 @@ check_txt_records() {
 
     print_info "Checking TXT records..."
 
-    # TXT records from simple.sh with expected content
-    check_record_value "$dns_server" "example.com" "TXT" "TXT record (SPF)" "v=spf1 mx -all"
-    check_record_value "$dns_server" "_dmarc.example.com" "TXT" "TXT record (DMARC)" "v=DMARC1" "p=quarantine"
-    check_record_value "$dns_server" "verification.example.com" "TXT" "TXT record" "google-site-verification=abc123def456"
-    check_record_value "$dns_server" "test.org" "TXT" "TXT record (SPF)" "v=spf1" "_spf.google.com"
-    check_record_value "$dns_server" "webapp.io" "TXT" "TXT record (SPF)" "v=spf1 mx a -all"
+    # Check all TXT records from testdata.sh
+    for record_info in "${TXT_RECORDS[@]}"; do
+        IFS=':' read -r zone name value <<< "$record_info"
+
+        local query_name
+        if [[ "$name" == "@" ]]; then
+            query_name="$zone"
+        else
+            query_name="${name}.${zone}"
+        fi
+
+        # Determine description based on content
+        local desc="TXT record"
+        [[ "$value" == v=spf1* ]] && desc="TXT record (SPF)"
+        [[ "$value" == v=DMARC1* ]] && desc="TXT record (DMARC)"
+
+        # For TXT records, we check if the expected value is contained in the response
+        # since TXT records may have quotes or be split
+        check_record_value "$dns_server" "$query_name" "TXT" "$desc" "$value"
+    done
 }
 
 check_srv_records() {
@@ -234,11 +274,22 @@ check_srv_records() {
 
     print_info "Checking SRV records..."
 
-    # SRV records from simple.sh with expected priority, weight, port, target
-    check_record_value "$dns_server" "_sip._tcp.example.com" "SRV" "SRV record (SIP)" "10 60 5060 sipserver.example.com."
-    check_record_value "$dns_server" "_xmpp._tcp.example.com" "SRV" "SRV record (XMPP)" "5 30 5222 xmpp.example.com."
-    check_record_value "$dns_server" "_ldap._tcp.test.org" "SRV" "SRV record (LDAP)" "10 100 389 ldap.test.org."
-    check_record_value "$dns_server" "_http._tcp.service.net" "SRV" "SRV record (HTTP)" "10 50 80 web.service.net."
+    # Check all SRV records from testdata.sh
+    for record_info in "${SRV_RECORDS[@]}"; do
+        IFS=':' read -r zone name priority weight port target <<< "$record_info"
+        local fqdn="${name}.${zone}"
+
+        local srv_value="$priority $weight $port $target"
+
+        # Determine description based on service
+        local desc="SRV record"
+        [[ "$name" == *sip* ]] && desc="SRV record (SIP)"
+        [[ "$name" == *xmpp* ]] && desc="SRV record (XMPP)"
+        [[ "$name" == *ldap* ]] && desc="SRV record (LDAP)"
+        [[ "$name" == *http* ]] && desc="SRV record (HTTP)"
+
+        check_record_value "$dns_server" "$fqdn" "SRV" "$desc" "$srv_value"
+    done
 }
 
 check_soa_records() {
@@ -246,13 +297,15 @@ check_soa_records() {
 
     print_info "Checking SOA records..."
 
-    # Check SOA for main zones - we just verify they exist and contain expected email
-    check_record_value "$dns_server" "example.com" "SOA" "SOA record" "admin.example.com"
-    check_record_value "$dns_server" "test.org" "SOA" "SOA record" "hostmaster.test.org"
-    check_record_value "$dns_server" "api.dev" "SOA" "SOA record" "devops.api.dev"
-    check_record_value "$dns_server" "webapp.io" "SOA" "SOA record" "admin.webapp.io"
-    check_record_value "$dns_server" "myapp.cloud" "SOA" "SOA record" "ops.myapp.cloud"
-    check_record_value "$dns_server" "service.net" "SOA" "SOA record" "admin.service.net"
+    # Check SOA records for all zones - verify they exist and contain expected email
+    for zone_info in "${ZONES[@]}"; do
+        IFS=':' read -r project zone email ttl description <<< "$zone_info"
+
+        # Convert email format: admin@example.com -> admin.example.com
+        local soa_email=$(echo "$email" | sed 's/@/./')
+
+        check_record_value "$dns_server" "$zone" "SOA" "SOA record" "$soa_email"
+    done
 }
 
 check_ns_records() {
@@ -260,11 +313,11 @@ check_ns_records() {
 
     print_info "Checking NS records..."
 
-    # Check NS records exist for main zones (values are deployment-specific)
+    # Check NS records exist for all zones (values are deployment-specific)
     # We just verify the query returns something
-    local zones=("example.com" "test.org" "api.dev" "webapp.io")
+    for zone_info in "${ZONES[@]}"; do
+        IFS=':' read -r project zone email ttl description <<< "$zone_info"
 
-    for zone in "${zones[@]}"; do
         local result=$(query_dns "$dns_server" "$zone" "NS")
 
         if [[ -n "$result" ]]; then

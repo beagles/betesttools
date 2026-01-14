@@ -15,6 +15,14 @@
 set -e  # Exit on error
 
 # ============================================================================
+# Load Test Data
+# ============================================================================
+
+# Source common test data definitions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/testdata.sh"
+
+# ============================================================================
 # Configuration
 # ============================================================================
 
@@ -92,10 +100,9 @@ count_missing() {
 check_tlds() {
     print_section "Checking TLDs"
 
-    local expected_tlds=("com" "org" "net" "edu" "io" "dev" "cloud" "local")
     local existing_tlds=$($os tld list -c name -f value 2>/dev/null || echo "")
 
-    for tld in "${expected_tlds[@]}"; do
+    for tld in "${TLDS[@]}"; do
         if resource_exists "$existing_tlds" "$tld"; then
             print_found "TLD exists: $tld"
             count_found "tlds"
@@ -113,10 +120,11 @@ check_tlds() {
 check_projects() {
     print_section "Checking Projects"
 
-    local expected_projects=("project1" "project2" "project3" "admin-project")
     local existing_projects=$($os project list -c Name -f value 2>/dev/null || echo "")
 
-    for project_name in "${expected_projects[@]}"; do
+    for project_info in "${PROJECTS[@]}"; do
+        IFS=':' read -r project_name project_desc <<< "$project_info"
+
         if resource_exists "$existing_projects" "$project_name"; then
             local project_id=$(get_project_id "$project_name")
             print_found "Project exists: $project_name (ID: $project_id)"
@@ -135,15 +143,7 @@ check_projects() {
 check_quotas() {
     print_section "Checking Project Quotas"
 
-    # Define expected quotas: project_name:zones:zone_recordsets:zone_records:recordset_records
-    local quota_configs=(
-        "project1:10:100:100:20"
-        "project2:5:50:50:10"
-        "project3:3:30:30:10"
-        "admin-project:50:500:500:50"
-    )
-
-    for quota_config in "${quota_configs[@]}"; do
+    for quota_config in "${QUOTAS[@]}"; do
         IFS=':' read -r project_name zones zone_recordsets zone_records recordset_records <<< "$quota_config"
 
         local project_id=$(get_project_id "$project_name")
@@ -181,16 +181,11 @@ check_quotas() {
 check_blacklists() {
     print_section "Checking Blacklists"
 
-    local expected_patterns=(
-        ".*spam.*"
-        ".*test123.*"
-        "^blocked\\..*"
-        ".*\\.invalid$"
-    )
-
     local existing_blacklists=$($os zone blacklist list -c pattern -f value 2>/dev/null || echo "")
 
-    for pattern in "${expected_patterns[@]}"; do
+    for blacklist_info in "${BLACKLISTS[@]}"; do
+        IFS=':' read -r pattern description <<< "$blacklist_info"
+
         if resource_exists "$existing_blacklists" "$pattern"; then
             print_found "Blacklist exists: $pattern"
             count_found "blacklists"
@@ -208,26 +203,10 @@ check_blacklists() {
 check_zones() {
     print_section "Checking DNS Zones"
 
-    # Define expected zones: zone_name:project_name
-    local expected_zones=(
-        "example.com.:project1"
-        "test.org.:project1"
-        "api.dev.:project1"
-        "webapp.io.:project1"
-        "myapp.cloud.:project1"
-        "service.net.:project2"
-        "backend.dev.:project2"
-        "shared.edu.:project2"
-        "partner.com.:project3"
-        "external.org.:project3"
-        "admin.local.:admin-project"
-        "internal.cloud.:admin-project"
-    )
-
     local existing_zones=$($os zone list --all-projects -c name -f value 2>/dev/null || echo "")
 
-    for zone_info in "${expected_zones[@]}"; do
-        IFS=':' read -r zone_name project_name <<< "$zone_info"
+    for zone_info in "${ZONES[@]}"; do
+        IFS=':' read -r project_name zone_name email ttl description <<< "$zone_info"
 
         if resource_exists "$existing_zones" "$zone_name"; then
             print_found "Zone exists: $zone_name (project: $project_name)"
@@ -246,16 +225,7 @@ check_zones() {
 check_zone_shares() {
     print_section "Checking Zone Shares"
 
-    # Define expected shares: zone_name:target_project_name
-    local expected_shares=(
-        "example.com.:project2"
-        "api.dev.:project3"
-        "shared.edu.:project1"
-        "shared.edu.:project3"
-        "internal.cloud.:project1"
-    )
-
-    for share_info in "${expected_shares[@]}"; do
+    for share_info in "${ZONE_SHARES[@]}"; do
         IFS=':' read -r zone_name target_project_name <<< "$share_info"
 
         local target_project_id=$(get_project_id "$target_project_name")

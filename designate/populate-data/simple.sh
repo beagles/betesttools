@@ -15,6 +15,14 @@
 set -e  # Exit on error
 
 # ============================================================================
+# Load Test Data
+# ============================================================================
+
+# Source common test data definitions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/testdata.sh"
+
+# ============================================================================
 # Configuration
 # ============================================================================
 
@@ -92,10 +100,9 @@ count_skipped() {
 create_tlds() {
     print_section "Creating TLDs"
 
-    local tlds=("com" "org" "net" "edu" "io" "dev" "cloud" "local")
     local existing_tlds=$($os tld list -c name -f value 2>/dev/null || echo "")
 
-    for tld in "${tlds[@]}"; do
+    for tld in "${TLDS[@]}"; do
         if resource_exists "$existing_tlds" "$tld"; then
             print_info "TLD already exists: $tld"
             count_skipped "tlds"
@@ -117,16 +124,9 @@ create_tlds() {
 create_projects() {
     print_section "Creating Projects"
 
-    local projects=(
-        "project1:Primary testing project"
-        "project2:Secondary testing project"
-        "project3:Zone sharing recipient project"
-        "admin-project:Administrative testing project"
-    )
-
     local existing_projects=$($os project list -c Name -f value 2>/dev/null || echo "")
 
-    for project_info in "${projects[@]}"; do
+    for project_info in "${PROJECTS[@]}"; do
         IFS=':' read -r project_name project_desc <<< "$project_info"
 
         if resource_exists "$existing_projects" "$project_name"; then
@@ -150,15 +150,7 @@ create_projects() {
 set_quotas() {
     print_section "Configuring Project Quotas"
 
-    # Define quotas: project_name:zones:zone_recordsets:zone_records:recordset_records
-    local quota_configs=(
-        "project1:10:100:100:20"
-        "project2:5:50:50:10"
-        "project3:3:30:30:10"
-        "admin-project:50:500:500:50"
-    )
-
-    for quota_config in "${quota_configs[@]}"; do
+    for quota_config in "${QUOTAS[@]}"; do
         IFS=':' read -r project_name zones zone_recordsets zone_records recordset_records <<< "$quota_config"
 
         local project_id=$(get_project_id "$project_name")
@@ -187,16 +179,9 @@ set_quotas() {
 create_blacklists() {
     print_section "Creating Blacklists"
 
-    local blacklists=(
-        ".*spam.*:Block zones containing spam"
-        ".*test123.*:Block zones containing test123"
-        "^blocked\\..*:Block zones starting with blocked"
-        ".*\\.invalid$:Block zones ending with .invalid"
-    )
-
     local existing_blacklists=$($os zone blacklist list -c pattern -f value 2>/dev/null || echo "")
 
-    for blacklist_info in "${blacklists[@]}"; do
+    for blacklist_info in "${BLACKLISTS[@]}"; do
         IFS=':' read -r pattern description <<< "$blacklist_info"
 
         if resource_exists "$existing_blacklists" "$pattern"; then
@@ -220,29 +205,9 @@ create_blacklists() {
 create_zones() {
     print_section "Creating DNS Zones"
 
-    # Define zones: project_name:zone_name:email:ttl:description
-    local zones=(
-        # Project 1 zones
-        "project1:example.com.:admin@example.com:3600:Primary test zone"
-        "project1:test.org.:hostmaster@test.org:7200:Testing zone"
-        "project1:api.dev.:devops@api.dev:3600:API development zone"
-        "project1:webapp.io.:admin@webapp.io:86400:Web application zone"
-        "project1:myapp.cloud.:ops@myapp.cloud:3600:Cloud application zone"
-        # Project 2 zones
-        "project2:service.net.:admin@service.net:7200:Service zone"
-        "project2:backend.dev.:backend@backend.dev:3600:Backend development zone"
-        "project2:shared.edu.:admin@shared.edu:3600:Shared educational zone"
-        # Project 3 zones
-        "project3:partner.com.:contact@partner.com:3600:Partner zone"
-        "project3:external.org.:external@external.org:7200:External zone"
-        # Admin project zones
-        "admin-project:admin.local.:root@admin.local:3600:Admin internal zone"
-        "admin-project:internal.cloud.:ops@internal.cloud:3600:Internal cloud zone"
-    )
-
     local existing_zones=$($os zone list --all-projects -c name -f value 2>/dev/null || echo "")
 
-    for zone_info in "${zones[@]}"; do
+    for zone_info in "${ZONES[@]}"; do
         IFS=':' read -r project_name zone_name email ttl description <<< "$zone_info"
 
         local project_id=$(get_project_id "$project_name")
@@ -276,16 +241,7 @@ create_zones() {
 share_zones() {
     print_section "Sharing Zones Between Projects"
 
-    # Define shares: zone_name:target_project_name
-    local shares=(
-        "example.com.:project2"
-        "api.dev.:project3"
-        "shared.edu.:project1"
-        "shared.edu.:project3"
-        "internal.cloud.:project1"
-    )
-
-    for share_info in "${shares[@]}"; do
+    for share_info in "${ZONE_SHARES[@]}"; do
         IFS=':' read -r zone_name target_project_name <<< "$share_info"
 
         local target_project_id=$(get_project_id "$target_project_name")
@@ -338,28 +294,7 @@ create_recordsets() {
 }
 
 create_a_records() {
-    # Format: zone:name:ip1:ip2:ip3 (multiple IPs for round-robin)
-    local a_records=(
-        "example.com.:www:192.168.1.10:192.168.1.11"
-        "example.com.:web:10.0.0.10:10.0.0.11:10.0.0.12"
-        "example.com.:db1:192.168.2.20"
-        "example.com.:db2:192.168.2.21"
-        "example.com.:api:172.16.0.30:172.16.0.31"
-        "test.org.:www:203.0.113.10"
-        "test.org.:app:203.0.113.20:203.0.113.21"
-        "test.org.:cache:10.1.1.50:10.1.1.51"
-        "api.dev.:v1:192.168.10.100"
-        "api.dev.:v2:192.168.10.101"
-        "api.dev.:staging:192.168.10.200"
-        "webapp.io.:frontend:198.51.100.10:198.51.100.11"
-        "webapp.io.:backend:198.51.100.20"
-        "service.net.:api:172.20.0.10"
-        "service.net.:web:172.20.0.20:172.20.0.21"
-        "partner.com.:www:203.0.114.10"
-        "admin.local.:portal:10.255.0.10"
-    )
-
-    for record_info in "${a_records[@]}"; do
+    for record_info in "${A_RECORDS[@]}"; do
         IFS=':' read -r zone name ip1 ip2 ip3 <<< "$record_info"
 
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
@@ -384,17 +319,7 @@ create_a_records() {
 }
 
 create_aaaa_records() {
-    # IPv6 records
-    local aaaa_records=(
-        "example.com.:www:2001:db8::1:2001:db8::2"
-        "example.com.:web:2001:db8::10"
-        "test.org.:www:2001:db8:1::1"
-        "api.dev.:v1:2001:db8:2::100"
-        "webapp.io.:frontend:2001:db8:3::10:2001:db8:3::11"
-        "service.net.:api:2001:db8:4::10"
-    )
-
-    for record_info in "${aaaa_records[@]}"; do
+    for record_info in "${AAAA_RECORDS[@]}"; do
         IFS=':' read -r zone name ip1 ip2 <<< "$record_info"
 
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
@@ -418,19 +343,7 @@ create_aaaa_records() {
 }
 
 create_cname_records() {
-    # CNAME records: zone:name:target
-    local cname_records=(
-        "example.com.:blog:www.example.com."
-        "example.com.:shop:web.example.com."
-        "example.com.:docs:www.example.com."
-        "test.org.:mail:www.test.org."
-        "test.org.:ftp:www.test.org."
-        "api.dev.:latest:v2.api.dev."
-        "webapp.io.:app:frontend.webapp.io."
-        "service.net.:portal:web.service.net."
-    )
-
-    for record_info in "${cname_records[@]}"; do
+    for record_info in "${CNAME_RECORDS[@]}"; do
         IFS=':' read -r zone name target <<< "$record_info"
 
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
@@ -450,15 +363,7 @@ create_cname_records() {
 }
 
 create_mx_records() {
-    # MX records with priorities: zone:priority1:host1:priority2:host2
-    local mx_records=(
-        "example.com.:10:mail1.example.com.:20:mail2.example.com."
-        "test.org.:10:mx1.test.org.:20:mx2.test.org."
-        "webapp.io.:5:mail.webapp.io."
-        "partner.com.:10:mail.partner.com."
-    )
-
-    for record_info in "${mx_records[@]}"; do
+    for record_info in "${MX_RECORDS[@]}"; do
         IFS=':' read -r zone pri1 host1 pri2 host2 <<< "$record_info"
 
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
@@ -482,17 +387,7 @@ create_mx_records() {
 }
 
 create_txt_records() {
-    # TXT records: zone:name:value
-    local txt_records=(
-        "example.com.:@:v=spf1 mx -all"
-        "example.com.:_dmarc:v=DMARC1; p=quarantine; rua=mailto:postmaster@example.com"
-        "example.com.:verification:google-site-verification=abc123def456"
-        "test.org.:@:v=spf1 include:_spf.google.com ~all"
-        "webapp.io.:@:v=spf1 mx a -all"
-        "partner.com.:_verification:domain-verification=xyz789"
-    )
-
-    for record_info in "${txt_records[@]}"; do
+    for record_info in "${TXT_RECORDS[@]}"; do
         IFS=':' read -r zone name value <<< "$record_info"
 
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
@@ -517,15 +412,7 @@ create_txt_records() {
 }
 
 create_srv_records() {
-    # SRV records: zone:name:priority:weight:port:target
-    local srv_records=(
-        "example.com.:_sip._tcp:10:60:5060:sipserver.example.com."
-        "example.com.:_xmpp._tcp:5:30:5222:xmpp.example.com."
-        "test.org.:_ldap._tcp:10:100:389:ldap.test.org."
-        "service.net.:_http._tcp:10:50:80:web.service.net."
-    )
-
-    for record_info in "${srv_records[@]}"; do
+    for record_info in "${SRV_RECORDS[@]}"; do
         IFS=':' read -r zone name priority weight port target <<< "$record_info"
 
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
