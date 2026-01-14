@@ -74,6 +74,26 @@ get_project_id() {
     $os project show "$project_name" -c id -f value 2>/dev/null || echo ""
 }
 
+# Get user ID by username
+get_user_id() {
+    local username=$1
+    $os user show "$username" -c id -f value 2>/dev/null || echo ""
+}
+
+# Get user ID for a project (from USERS array)
+get_project_user_id() {
+    local project_name=$1
+    for user_info in "${USERS[@]}"; do
+        IFS=':' read -r username password proj_name <<< "$user_info"
+        if [[ "$proj_name" == "$project_name" ]]; then
+            get_user_id "$username"
+            return 0
+        fi
+    done
+    echo ""
+    return 1
+}
+
 # Check if resource exists in list
 resource_exists() {
     local list=$1
@@ -266,11 +286,17 @@ create_zones() {
             continue
         fi
 
+        local user_id=$(get_project_user_id "$project_name")
+        if [[ -z "$user_id" ]]; then
+            print_warning "User not found for project, skipping zone: $project_name"
+            continue
+        fi
+
         if resource_exists "$existing_zones" "$zone_name"; then
             print_info "Zone already exists: $zone_name"
             count_skipped "zones"
         else
-            if OS_PROJECT_ID="$project_id" $os zone create \
+            if OS_PROJECT_ID="$project_id" OS_USER_ID="$user_id" $os zone create \
                 --email "$email" \
                 --ttl "$ttl" \
                 --description "$description" \
@@ -300,6 +326,25 @@ share_zones() {
             continue
         fi
 
+        # Get the zone owner project and user
+        local owner_project=$(get_zone_owner_project "$zone_name")
+        if [[ -z "$owner_project" ]]; then
+            print_warning "Zone owner project not found, skipping share: $zone_name"
+            continue
+        fi
+
+        local owner_project_id=$(get_project_id "$owner_project")
+        if [[ -z "$owner_project_id" ]]; then
+            print_warning "Owner project ID not found, skipping share: $owner_project"
+            continue
+        fi
+
+        local owner_user_id=$(get_project_user_id "$owner_project")
+        if [[ -z "$owner_user_id" ]]; then
+            print_warning "Owner user not found for project, skipping share: $owner_project"
+            continue
+        fi
+
         # Check if share already exists
         local existing_shares=$($os zone share list "$zone_name" -c target_project_id -f value 2>/dev/null || echo "")
 
@@ -307,7 +352,7 @@ share_zones() {
             print_info "Zone already shared: $zone_name -> $target_project_name"
             count_skipped "shares"
         else
-            if $os zone share create "$zone_name" "$target_project_id" >/dev/null 2>&1; then
+            if OS_PROJECT_ID="$owner_project_id" OS_USER_ID="$owner_user_id" $os zone share create "$zone_name" "$target_project_id" >/dev/null 2>&1; then
                 print_success "Shared zone: $zone_name -> $target_project_name"
                 count_created "shares"
             else
@@ -347,6 +392,20 @@ create_a_records() {
     for record_info in "${A_RECORDS[@]}"; do
         IFS=':' read -r zone name ip1 ip2 ip3 <<< "$record_info"
 
+        # Get zone owner project and user
+        local owner_project=$(get_zone_owner_project "$zone")
+        if [[ -z "$owner_project" ]]; then
+            print_warning "Zone owner not found, skipping A record: $zone"
+            continue
+        fi
+
+        local owner_project_id=$(get_project_id "$owner_project")
+        local owner_user_id=$(get_project_user_id "$owner_project")
+        if [[ -z "$owner_project_id" || -z "$owner_user_id" ]]; then
+            print_warning "Owner project or user not found, skipping A record: $owner_project"
+            continue
+        fi
+
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
         local record_fqdn="${name}.${zone}"
 
@@ -358,7 +417,7 @@ create_a_records() {
             [[ -n "$ip2" ]] && record_args="$record_args --record $ip2"
             [[ -n "$ip3" ]] && record_args="$record_args --record $ip3"
 
-            if $os recordset create $record_args "$zone" "$name" >/dev/null 2>&1; then
+            if OS_PROJECT_ID="$owner_project_id" OS_USER_ID="$owner_user_id" $os recordset create $record_args "$zone" "$name" >/dev/null 2>&1; then
                 print_success "Created A record: $record_fqdn"
                 count_created "recordsets"
             else
@@ -372,6 +431,20 @@ create_aaaa_records() {
     for record_info in "${AAAA_RECORDS[@]}"; do
         IFS=':' read -r zone name ip1 ip2 <<< "$record_info"
 
+        # Get zone owner project and user
+        local owner_project=$(get_zone_owner_project "$zone")
+        if [[ -z "$owner_project" ]]; then
+            print_warning "Zone owner not found, skipping AAAA record: $zone"
+            continue
+        fi
+
+        local owner_project_id=$(get_project_id "$owner_project")
+        local owner_user_id=$(get_project_user_id "$owner_project")
+        if [[ -z "$owner_project_id" || -z "$owner_user_id" ]]; then
+            print_warning "Owner project or user not found, skipping AAAA record: $owner_project"
+            continue
+        fi
+
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
         local record_fqdn="${name}.${zone}"
 
@@ -382,7 +455,7 @@ create_aaaa_records() {
             [[ -n "$ip1" ]] && record_args="$record_args --record $ip1"
             [[ -n "$ip2" ]] && record_args="$record_args --record $ip2"
 
-            if $os recordset create $record_args "$zone" "$name" >/dev/null 2>&1; then
+            if OS_PROJECT_ID="$owner_project_id" OS_USER_ID="$owner_user_id" $os recordset create $record_args "$zone" "$name" >/dev/null 2>&1; then
                 print_success "Created AAAA record: $record_fqdn"
                 count_created "recordsets"
             else
@@ -396,13 +469,27 @@ create_cname_records() {
     for record_info in "${CNAME_RECORDS[@]}"; do
         IFS=':' read -r zone name target <<< "$record_info"
 
+        # Get zone owner project and user
+        local owner_project=$(get_zone_owner_project "$zone")
+        if [[ -z "$owner_project" ]]; then
+            print_warning "Zone owner not found, skipping CNAME record: $zone"
+            continue
+        fi
+
+        local owner_project_id=$(get_project_id "$owner_project")
+        local owner_user_id=$(get_project_user_id "$owner_project")
+        if [[ -z "$owner_project_id" || -z "$owner_user_id" ]]; then
+            print_warning "Owner project or user not found, skipping CNAME record: $owner_project"
+            continue
+        fi
+
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
         local record_fqdn="${name}.${zone}"
 
         if resource_exists "$existing_records" "$record_fqdn"; then
             count_skipped "recordsets"
         else
-            if $os recordset create --type CNAME --record "$target" "$zone" "$name" >/dev/null 2>&1; then
+            if OS_PROJECT_ID="$owner_project_id" OS_USER_ID="$owner_user_id" $os recordset create --type CNAME --record "$target" "$zone" "$name" >/dev/null 2>&1; then
                 print_success "Created CNAME record: $record_fqdn -> $target"
                 count_created "recordsets"
             else
@@ -416,6 +503,20 @@ create_mx_records() {
     for record_info in "${MX_RECORDS[@]}"; do
         IFS=':' read -r zone pri1 host1 pri2 host2 <<< "$record_info"
 
+        # Get zone owner project and user
+        local owner_project=$(get_zone_owner_project "$zone")
+        if [[ -z "$owner_project" ]]; then
+            print_warning "Zone owner not found, skipping MX record: $zone"
+            continue
+        fi
+
+        local owner_project_id=$(get_project_id "$owner_project")
+        local owner_user_id=$(get_project_user_id "$owner_project")
+        if [[ -z "$owner_project_id" || -z "$owner_user_id" ]]; then
+            print_warning "Owner project or user not found, skipping MX record: $owner_project"
+            continue
+        fi
+
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
 
         # MX records use @ for the zone apex
@@ -426,7 +527,7 @@ create_mx_records() {
             [[ -n "$pri1" && -n "$host1" ]] && record_args="$record_args --record \"$pri1 $host1\""
             [[ -n "$pri2" && -n "$host2" ]] && record_args="$record_args --record \"$pri2 $host2\""
 
-            if eval $os recordset create $record_args "$zone" @ >/dev/null 2>&1; then
+            if eval OS_PROJECT_ID="$owner_project_id" OS_USER_ID="$owner_user_id" $os recordset create $record_args "$zone" @ >/dev/null 2>&1; then
                 print_success "Created MX record for: $zone"
                 count_created "recordsets"
             else
@@ -440,6 +541,20 @@ create_txt_records() {
     for record_info in "${TXT_RECORDS[@]}"; do
         IFS=':' read -r zone name value <<< "$record_info"
 
+        # Get zone owner project and user
+        local owner_project=$(get_zone_owner_project "$zone")
+        if [[ -z "$owner_project" ]]; then
+            print_warning "Zone owner not found, skipping TXT record: $zone"
+            continue
+        fi
+
+        local owner_project_id=$(get_project_id "$owner_project")
+        local owner_user_id=$(get_project_user_id "$owner_project")
+        if [[ -z "$owner_project_id" || -z "$owner_user_id" ]]; then
+            print_warning "Owner project or user not found, skipping TXT record: $owner_project"
+            continue
+        fi
+
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
         local record_fqdn
         if [[ "$name" == "@" ]]; then
@@ -451,7 +566,7 @@ create_txt_records() {
         if resource_exists "$existing_records" "$record_fqdn"; then
             count_skipped "recordsets"
         else
-            if $os recordset create --type TXT --record "\"$value\"" "$zone" "$name" >/dev/null 2>&1; then
+            if OS_PROJECT_ID="$owner_project_id" OS_USER_ID="$owner_user_id" $os recordset create --type TXT --record "\"$value\"" "$zone" "$name" >/dev/null 2>&1; then
                 print_success "Created TXT record: $record_fqdn"
                 count_created "recordsets"
             else
@@ -465,6 +580,20 @@ create_srv_records() {
     for record_info in "${SRV_RECORDS[@]}"; do
         IFS=':' read -r zone name priority weight port target <<< "$record_info"
 
+        # Get zone owner project and user
+        local owner_project=$(get_zone_owner_project "$zone")
+        if [[ -z "$owner_project" ]]; then
+            print_warning "Zone owner not found, skipping SRV record: $zone"
+            continue
+        fi
+
+        local owner_project_id=$(get_project_id "$owner_project")
+        local owner_user_id=$(get_project_user_id "$owner_project")
+        if [[ -z "$owner_project_id" || -z "$owner_user_id" ]]; then
+            print_warning "Owner project or user not found, skipping SRV record: $owner_project"
+            continue
+        fi
+
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
         local record_fqdn="${name}.${zone}"
 
@@ -472,7 +601,7 @@ create_srv_records() {
             count_skipped "recordsets"
         else
             local srv_value="$priority $weight $port $target"
-            if $os recordset create --type SRV --record "$srv_value" "$zone" "$name" >/dev/null 2>&1; then
+            if OS_PROJECT_ID="$owner_project_id" OS_USER_ID="$owner_user_id" $os recordset create --type SRV --record "$srv_value" "$zone" "$name" >/dev/null 2>&1; then
                 print_success "Created SRV record: $record_fqdn"
                 count_created "recordsets"
             else

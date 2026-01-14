@@ -202,6 +202,19 @@ SRV_RECORDS=(
 # Helper Functions for Data Access
 # ============================================================================
 
+# Get zone owner project from ZONES array by zone name
+get_zone_owner_project() {
+    local zone_name=$1
+    for zone_info in "${ZONES[@]}"; do
+        IFS=':' read -r project zone email ttl description <<< "$zone_info"
+        if [[ "$zone" == "$zone_name" ]]; then
+            echo "$project"
+            return 0
+        fi
+    done
+    return 1
+}
+
 # Get zone email from ZONES array by zone name
 get_zone_email() {
     local zone_name=$1
