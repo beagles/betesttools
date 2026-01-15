@@ -123,12 +123,12 @@ A_RECORDS=(
 
 # AAAA Records: zone:name:ip1:ip2 (IPv6 addresses)
 AAAA_RECORDS=(
-    "example.com.:www:2001:db8::1:2001:db8::2"
-    "example.com.:web:2001:db8::10"
-    "test.org.:www:2001:db8:1::1"
-    "api.dev.:v1:2001:db8:2::100"
-    "webapp.io.:frontend:2001:db8:3::10:2001:db8:3::11"
-    "service.net.:api:2001:db8:4::10"
+    "example.com.#www#2001:db8::1:2001:db8::2"
+    "example.com.#web#:2001:db8::10"
+    "test.org.#www#2001:db8:1::1"
+    "api.dev.#v1#2001:db8:2::100"
+    "webapp.io.#frontend#2001:db8:3::10:2001:db8:3::11"
+    "service.net.#ap#2001:db8:4::10"
 )
 
 # ============================================================================
@@ -151,12 +151,12 @@ CNAME_RECORDS=(
 # MX Record Definitions
 # ============================================================================
 
-# MX Records: zone:priority1:host1:priority2:host2
+# MX Records: zone:name:priority1:host1:priority2:host2
 MX_RECORDS=(
-    "example.com.:10:mail1.example.com.:20:mail2.example.com."
-    "test.org.:10:mx1.test.org.:20:mx2.test.org."
-    "webapp.io.:5:mail.webapp.io."
-    "partner.com.:10:mail.partner.com."
+    "example.com.:mail.example.com.:10:mail1.example.com.:20:mail2.example.com."
+    "test.org.:mx.test.org.:10:mx1.test.org.:20:mx2.test.org."
+    "webapp.io.:webmail.webapp.io.:5:mail.webapp.io."
+    "partner.com.:mail.partner.com.:10:mail1.partner.com."
 )
 
 # ============================================================================

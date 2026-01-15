@@ -331,7 +331,7 @@ create_a_records() {
 
 create_aaaa_records() {
     for record_info in "${AAAA_RECORDS[@]}"; do
-        IFS=':' read -r zone name ip1 ip2 <<< "$record_info"
+        IFS='#' read -r zone name ip1 ip2 <<< "$record_info"
 
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
         local record_fqdn="${name}.${zone}"
@@ -375,7 +375,7 @@ create_cname_records() {
 
 create_mx_records() {
     for record_info in "${MX_RECORDS[@]}"; do
-        IFS=':' read -r zone pri1 host1 pri2 host2 <<< "$record_info"
+        IFS=':' read -r zone name pri1 host1 pri2 host2 <<< "$record_info"
 
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
 
@@ -384,10 +384,10 @@ create_mx_records() {
             count_skipped "recordsets"
         else
             local record_args="--type MX"
-            [[ -n "$pri1" && -n "$host1" ]] && record_args="$record_args --record \"$pri1 $host1\""
-            [[ -n "$pri2" && -n "$host2" ]] && record_args="$record_args --record \"$pri2 $host2\""
+            [[ -n "$pri1" && -n "$host1" ]] && record_args="$record_args  --record \"$pri1 $host1\""
+            [[ -n "$pri2" && -n "$host2" ]] && record_args="$record_args  --record \"$pri2 $host2\""
 
-            if eval $os recordset create $record_args "$zone" @ >/dev/null 2>&1; then
+            if eval $os recordset create $record_args "$zone" "$name"  >/dev/null 2>&1; then
                 print_success "Created MX record for: $zone"
                 count_created "recordsets"
             else

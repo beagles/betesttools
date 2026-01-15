@@ -313,7 +313,7 @@ check_sample_aaaa_records() {
     )
 
     for record_info in "${sample_records[@]}"; do
-        IFS=':' read -r zone record_fqdn <<< "$record_info"
+        IFS='#' read -r zone record_fqdn <<< "$record_info"
 
         # Check if recordset exists and has AAAA type
         local recordset_info=$($os recordset show "$zone" "$record_fqdn" -c type -c records -f value 2>/dev/null || echo "")
