@@ -42,7 +42,6 @@ The `testdata.sh` file contains bash arrays defining:
 - **Quotas**: Quota configurations for each project
 - **Blacklists**: 4 regex patterns for blocking zone names
 - **Zones**: 12 DNS zones with project, email, TTL, and description
-- **Zone Shares**: 5 zone sharing configurations
 - **A Records**: 17 IPv4 address records (some with multiple IPs for round-robin)
 - **AAAA Records**: 6 IPv6 address records
 - **CNAME Records**: 8 canonical name records
@@ -87,7 +86,7 @@ The script creates the following resources:
 2. **Projects (4)**:
    - `project1`: Primary testing project with standard quotas
    - `project2`: Secondary project with restricted quotas
-   - `project3`: Zone sharing recipient project
+   - `project3`: Tertiary testing project
    - `admin-project`: Administrative project with elevated quotas
 3. **Users (4)**: One user per project with admin role assigned:
    - `project1-user`: User for project1 with admin role
@@ -97,15 +96,14 @@ The script creates the following resources:
 4. **Quotas (4 sets)**: Different quota configurations per project for testing limits
 5. **Blacklists (4)**: Regex patterns to block zone creation (spam, test123, blocked.*, *.invalid)
 6. **Zones (12)**: DNS zones distributed across projects with varying TTLs
-7. **Zone Shares (5)**: Shared zones between projects for multi-tenant testing
-8. **Recordsets (50+)**: Multiple DNS records per zone including:
+7. **Recordsets (50+)**: Multiple DNS records per zone including:
    - A records (17): IPv4 addresses, including multi-value round-robin records
    - AAAA records (6): IPv6 addresses
    - CNAME records (8): Aliases and canonical names
    - MX records (4): Mail exchange records with priorities
    - TXT records (6): SPF, DMARC, and verification records
    - SRV records (4): Service discovery records
-9. **PTR Records**: Reverse DNS for Neutron floating IPs (when available)
+8. **PTR Records**: Reverse DNS for Neutron floating IPs (when available)
 
 #### Usage
 
@@ -145,9 +143,6 @@ openstack zone list --all-projects
 # View recordsets in a zone
 openstack recordset list example.com.
 
-# View zone shares
-openstack zone share list example.com.
-
 # View project quotas
 openstack dns quota list --project-id $(openstack project show project1 -c id -f value)
 
@@ -173,15 +168,14 @@ The script verifies the presence of:
 5. **Quotas (4 sets)**: Validates quota configurations match expected values
 6. **Blacklists (4)**: All regex patterns
 7. **Zones (12)**: All DNS zones across projects
-8. **Zone Shares (5)**: All shared zone configurations
-9. **Recordsets (Sample)**: Representative sample of each record type:
+8. **Recordsets (Sample)**: Representative sample of each record type:
    - A records (5 samples)
    - AAAA records (3 samples)
    - CNAME records (3 samples)
    - MX records (3 zones)
    - TXT records (3 samples)
    - SRV records (3 samples)
-10. **PTR Records**: Lists any existing PTR records
+9. **PTR Records**: Lists any existing PTR records
 
 #### Usage
 

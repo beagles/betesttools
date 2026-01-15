@@ -27,7 +27,7 @@ TLDS=("com" "org" "net" "edu" "io" "dev" "cloud" "local")
 PROJECTS=(
     "project1:Primary testing project"
     "project2:Secondary testing project"
-    "project3:Zone sharing recipient project"
+    "project3:Tertiary testing project"
     "admin-project:Administrative testing project"
 )
 
@@ -90,19 +90,6 @@ ZONES=(
     # Admin project zones
     "admin-project:admin.local.:root@admin.local:3600:Admin internal zone"
     "admin-project:internal.cloud.:ops@internal.cloud:3600:Internal cloud zone"
-)
-
-# ============================================================================
-# Zone Share Definitions
-# ============================================================================
-
-# Zone shares: zone_name:target_project_name
-ZONE_SHARES=(
-    "example.com.:project2"
-    "api.dev.:project3"
-    "shared.edu.:project1"
-    "shared.edu.:project3"
-    "internal.cloud.:project1"
 )
 
 # ============================================================================

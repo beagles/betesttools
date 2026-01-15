@@ -254,35 +254,6 @@ check_zones() {
 }
 
 # ============================================================================
-# Zone Share Verification
-# ============================================================================
-
-check_zone_shares() {
-    print_section "Checking Zone Shares"
-
-    for share_info in "${ZONE_SHARES[@]}"; do
-        IFS=':' read -r zone_name target_project_name <<< "$share_info"
-
-        local target_project_id=$(get_project_id "$target_project_name")
-        if [[ -z "$target_project_id" ]]; then
-            print_warning "Target project not found, skipping share check: $target_project_name"
-            continue
-        fi
-
-        # Check if share exists
-        local existing_shares=$($os zone share list "$zone_name" -c target_project_id -f value 2>/dev/null || echo "")
-
-        if resource_exists "$existing_shares" "$target_project_id"; then
-            print_found "Zone shared: $zone_name -> $target_project_name"
-            count_found "shares"
-        else
-            print_missing "Zone share missing: $zone_name -> $target_project_name"
-            count_missing "shares"
-        fi
-    done
-}
-
-# ============================================================================
 # Recordset Verification
 # ============================================================================
 
@@ -552,7 +523,6 @@ main() {
     check_quotas
     check_blacklists
     check_zones
-    check_zone_shares
     check_recordsets
     check_ptr_records
 

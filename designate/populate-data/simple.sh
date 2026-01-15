@@ -94,6 +94,19 @@ get_project_user_id() {
     return 1
 }
 
+get_project_user_password() {
+    local project_name=$1
+    for user_info in "${USERS[@]}"; do
+        IFS=':' read -r username password proj_name <<< "$user_info"
+        if [[ "$proj_name" == "$project_name" ]]; then
+            echo "$password"
+            return 0
+        fi
+    done
+    echo ""
+    return 1
+}
+
 # Check if resource exists in list
 resource_exists() {
     local list=$1
@@ -296,7 +309,10 @@ create_zones() {
             print_info "Zone already exists: $zone_name"
             count_skipped "zones"
         else
-            if OS_PROJECT_ID="$project_id" OS_USER_ID="$user_id" $os zone create \
+            local user_password=$(get_project_user_password "$project_name")
+
+            $os token issue --os-remote-project-name "$project_name" --os-user-id "$user_id"
+            if OS_PROJECT_ID="$project_id" OS_USER_ID="$user_id" OS_PASSWORD="$user_password" $os zone create \
                 --email "$email" \
                 --ttl "$ttl" \
                 --description "$description" \
@@ -305,58 +321,6 @@ create_zones() {
                 count_created "zones"
             else
                 print_error "Failed to create zone: $zone_name"
-            fi
-        fi
-    done
-}
-
-# ============================================================================
-# Zone Sharing
-# ============================================================================
-
-share_zones() {
-    print_section "Sharing Zones Between Projects"
-
-    for share_info in "${ZONE_SHARES[@]}"; do
-        IFS=':' read -r zone_name target_project_name <<< "$share_info"
-
-        local target_project_id=$(get_project_id "$target_project_name")
-        if [[ -z "$target_project_id" ]]; then
-            print_warning "Target project not found, skipping share: $target_project_name"
-            continue
-        fi
-
-        # Get the zone owner project and user
-        local owner_project=$(get_zone_owner_project "$zone_name")
-        if [[ -z "$owner_project" ]]; then
-            print_warning "Zone owner project not found, skipping share: $zone_name"
-            continue
-        fi
-
-        local owner_project_id=$(get_project_id "$owner_project")
-        if [[ -z "$owner_project_id" ]]; then
-            print_warning "Owner project ID not found, skipping share: $owner_project"
-            continue
-        fi
-
-        local owner_user_id=$(get_project_user_id "$owner_project")
-        if [[ -z "$owner_user_id" ]]; then
-            print_warning "Owner user not found for project, skipping share: $owner_project"
-            continue
-        fi
-
-        # Check if share already exists
-        local existing_shares=$($os zone share list "$zone_name" -c target_project_id -f value 2>/dev/null || echo "")
-
-        if resource_exists "$existing_shares" "$target_project_id"; then
-            print_info "Zone already shared: $zone_name -> $target_project_name"
-            count_skipped "shares"
-        else
-            if OS_PROJECT_ID="$owner_project_id" OS_USER_ID="$owner_user_id" $os zone share create "$zone_name" "$target_project_id" >/dev/null 2>&1; then
-                print_success "Shared zone: $zone_name -> $target_project_name"
-                count_created "shares"
-            else
-                print_error "Failed to share zone: $zone_name -> $target_project_name"
             fi
         fi
     done
@@ -692,7 +656,6 @@ print_summary() {
     print_info "You can now test various Designate features:"
     echo "  - View zones: openstack zone list"
     echo "  - View recordsets: openstack recordset list <zone>"
-    echo "  - View zone shares: openstack zone share list <zone>"
     echo "  - View quotas: openstack dns quota list --project-id <project-id>"
     echo "  - View blacklists: openstack zone blacklist list"
 }
@@ -729,7 +692,6 @@ main() {
     set_quotas
     create_blacklists
     create_zones
-    share_zones
     create_recordsets
     create_ptr_records
 
