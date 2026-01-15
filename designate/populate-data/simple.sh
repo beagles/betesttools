@@ -300,6 +300,9 @@ create_zones() {
         else
             local user_password=$(get_project_user_password "$project_name")
 
+            # Create authorization token for this project and user
+            $os token issue --os-remote-project-name "$project_name" --os-user "$username" >/dev/null 2>&1
+
             if OS_PROJECT_NAME="$project_name" OS_USERNAME="$username" OS_PASSWORD="$user_password" $os zone create \
                 --email "$email" \
                 --ttl "$ttl" \
@@ -368,7 +371,11 @@ create_a_records() {
             [[ -n "$ip2" ]] && record_args="$record_args --record $ip2"
             [[ -n "$ip3" ]] && record_args="$record_args --record $ip3"
 
-            if OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" $os recordset create $record_args "$zone" "$name" >/dev/null 2>&1; then
+            # Get password and create authorization token for this project and user
+            local user_password=$(get_project_user_password "$owner_project")
+            $os token issue --os-remote-project-name "$owner_project" --os-user "$username" >/dev/null 2>&1
+
+            if OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" OS_PASSWORD="$user_password" $os recordset create $record_args "$zone" "$name" >/dev/null 2>&1; then
                 print_success "Created A record: $record_fqdn"
                 count_created "recordsets"
             else
@@ -405,7 +412,11 @@ create_aaaa_records() {
             [[ -n "$ip1" ]] && record_args="$record_args --record $ip1"
             [[ -n "$ip2" ]] && record_args="$record_args --record $ip2"
 
-            if OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" $os recordset create $record_args "$zone" "$name" >/dev/null 2>&1; then
+            # Get password and create authorization token for this project and user
+            local user_password=$(get_project_user_password "$owner_project")
+            $os token issue --os-remote-project-name "$owner_project" --os-user "$username" >/dev/null 2>&1
+
+            if OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" OS_PASSWORD="$user_password" $os recordset create $record_args "$zone" "$name" >/dev/null 2>&1; then
                 print_success "Created AAAA record: $record_fqdn"
                 count_created "recordsets"
             else
@@ -438,7 +449,11 @@ create_cname_records() {
         if resource_exists "$existing_records" "$record_fqdn"; then
             count_skipped "recordsets"
         else
-            if OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" $os recordset create --type CNAME --record "$target" "$zone" "$name" >/dev/null 2>&1; then
+            # Get password and create authorization token for this project and user
+            local user_password=$(get_project_user_password "$owner_project")
+            $os token issue --os-remote-project-name "$owner_project" --os-user "$username" >/dev/null 2>&1
+
+            if OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" OS_PASSWORD="$user_password" $os recordset create --type CNAME --record "$target" "$zone" "$name" >/dev/null 2>&1; then
                 print_success "Created CNAME record: $record_fqdn -> $target"
                 count_created "recordsets"
             else
@@ -475,7 +490,11 @@ create_mx_records() {
             [[ -n "$pri1" && -n "$host1" ]] && record_args="$record_args --record \"$pri1 $host1\""
             [[ -n "$pri2" && -n "$host2" ]] && record_args="$record_args --record \"$pri2 $host2\""
 
-            if eval OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" $os recordset create $record_args "$zone" @ >/dev/null 2>&1; then
+            # Get password and create authorization token for this project and user
+            local user_password=$(get_project_user_password "$owner_project")
+            $os token issue --os-remote-project-name "$owner_project" --os-user "$username" >/dev/null 2>&1
+
+            if eval OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" OS_PASSWORD="$user_password" $os recordset create $record_args "$zone" @ >/dev/null 2>&1; then
                 print_success "Created MX record for: $zone"
                 count_created "recordsets"
             else
@@ -513,7 +532,11 @@ create_txt_records() {
         if resource_exists "$existing_records" "$record_fqdn"; then
             count_skipped "recordsets"
         else
-            if OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" $os recordset create --type TXT --record "\"$value\"" "$zone" "$name" >/dev/null 2>&1; then
+            # Get password and create authorization token for this project and user
+            local user_password=$(get_project_user_password "$owner_project")
+            $os token issue --os-remote-project-name "$owner_project" --os-user "$username" >/dev/null 2>&1
+
+            if OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" OS_PASSWORD="$user_password" $os recordset create --type TXT --record "\"$value\"" "$zone" "$name" >/dev/null 2>&1; then
                 print_success "Created TXT record: $record_fqdn"
                 count_created "recordsets"
             else
@@ -547,7 +570,12 @@ create_srv_records() {
             count_skipped "recordsets"
         else
             local srv_value="$priority $weight $port $target"
-            if OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" $os recordset create --type SRV --record "$srv_value" "$zone" "$name" >/dev/null 2>&1; then
+
+            # Get password and create authorization token for this project and user
+            local user_password=$(get_project_user_password "$owner_project")
+            $os token issue --os-remote-project-name "$owner_project" --os-user "$username" >/dev/null 2>&1
+
+            if OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" OS_PASSWORD="$user_password" $os recordset create --type SRV --record "$srv_value" "$zone" "$name" >/dev/null 2>&1; then
                 print_success "Created SRV record: $record_fqdn"
                 count_created "recordsets"
             else
