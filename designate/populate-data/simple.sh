@@ -74,34 +74,6 @@ get_project_id() {
     $os project show "$project_name" -c id -f value 2>/dev/null || echo ""
 }
 
-# Get username for a project (from USERS array)
-get_project_username() {
-    local project_name=$1
-    for user_info in "${USERS[@]}"; do
-        IFS=':' read -r username password proj_name <<< "$user_info"
-        if [[ "$proj_name" == "$project_name" ]]; then
-            echo "$username"
-            return 0
-        fi
-    done
-    echo ""
-    return 1
-}
-
-# Get password for a project's user (from USERS array)
-get_project_user_password() {
-    local project_name=$1
-    for user_info in "${USERS[@]}"; do
-        IFS=':' read -r username password proj_name <<< "$user_info"
-        if [[ "$proj_name" == "$project_name" ]]; then
-            echo "$password"
-            return 0
-        fi
-    done
-    echo ""
-    return 1
-}
-
 # Check if resource exists in list
 resource_exists() {
     local list=$1
@@ -288,27 +260,16 @@ create_zones() {
     for zone_info in "${ZONES[@]}"; do
         IFS=':' read -r project_name zone_name email ttl description <<< "$zone_info"
 
-        local username=$(get_project_username "$project_name")
-        if [[ -z "$username" ]]; then
-            print_warning "User not found for project, skipping zone: $project_name"
-            continue
-        fi
-
         if resource_exists "$existing_zones" "$zone_name"; then
             print_info "Zone already exists: $zone_name"
             count_skipped "zones"
         else
-            local user_password=$(get_project_user_password "$project_name")
-
-            # Create authorization token for this project and user
-            $os token issue --os-remote-project-name "$project_name" --os-user "$username" >/dev/null 2>&1
-
-            if OS_PROJECT_NAME="$project_name" OS_USERNAME="$username" OS_PASSWORD="$user_password" $os zone create \
+            if $os zone create \
                 --email "$email" \
                 --ttl "$ttl" \
                 --description "$description" \
                 "$zone_name" >/dev/null 2>&1; then
-                print_success "Created zone: $zone_name (project: $project_name)"
+                print_success "Created zone: $zone_name"
                 count_created "zones"
             else
                 print_error "Failed to create zone: $zone_name"
@@ -347,19 +308,6 @@ create_a_records() {
     for record_info in "${A_RECORDS[@]}"; do
         IFS=':' read -r zone name ip1 ip2 ip3 <<< "$record_info"
 
-        # Get zone owner project and user
-        local owner_project=$(get_zone_owner_project "$zone")
-        if [[ -z "$owner_project" ]]; then
-            print_warning "Zone owner not found, skipping A record: $zone"
-            continue
-        fi
-
-        local username=$(get_project_username "$owner_project")
-        if [[ -z "$username" ]]; then
-            print_warning "User not found for project, skipping A record: $owner_project"
-            continue
-        fi
-
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
         local record_fqdn="${name}.${zone}"
 
@@ -371,11 +319,7 @@ create_a_records() {
             [[ -n "$ip2" ]] && record_args="$record_args --record $ip2"
             [[ -n "$ip3" ]] && record_args="$record_args --record $ip3"
 
-            # Get password and create authorization token for this project and user
-            local user_password=$(get_project_user_password "$owner_project")
-            $os token issue --os-remote-project-name "$owner_project" --os-user "$username" >/dev/null 2>&1
-
-            if OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" OS_PASSWORD="$user_password" $os recordset create $record_args "$zone" "$name" >/dev/null 2>&1; then
+            if $os recordset create $record_args "$zone" "$name" >/dev/null 2>&1; then
                 print_success "Created A record: $record_fqdn"
                 count_created "recordsets"
             else
@@ -389,19 +333,6 @@ create_aaaa_records() {
     for record_info in "${AAAA_RECORDS[@]}"; do
         IFS=':' read -r zone name ip1 ip2 <<< "$record_info"
 
-        # Get zone owner project and user
-        local owner_project=$(get_zone_owner_project "$zone")
-        if [[ -z "$owner_project" ]]; then
-            print_warning "Zone owner not found, skipping AAAA record: $zone"
-            continue
-        fi
-
-        local username=$(get_project_username "$owner_project")
-        if [[ -z "$username" ]]; then
-            print_warning "User not found for project, skipping AAAA record: $owner_project"
-            continue
-        fi
-
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
         local record_fqdn="${name}.${zone}"
 
@@ -412,11 +343,7 @@ create_aaaa_records() {
             [[ -n "$ip1" ]] && record_args="$record_args --record $ip1"
             [[ -n "$ip2" ]] && record_args="$record_args --record $ip2"
 
-            # Get password and create authorization token for this project and user
-            local user_password=$(get_project_user_password "$owner_project")
-            $os token issue --os-remote-project-name "$owner_project" --os-user "$username" >/dev/null 2>&1
-
-            if OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" OS_PASSWORD="$user_password" $os recordset create $record_args "$zone" "$name" >/dev/null 2>&1; then
+            if $os recordset create $record_args "$zone" "$name" >/dev/null 2>&1; then
                 print_success "Created AAAA record: $record_fqdn"
                 count_created "recordsets"
             else
@@ -430,30 +357,13 @@ create_cname_records() {
     for record_info in "${CNAME_RECORDS[@]}"; do
         IFS=':' read -r zone name target <<< "$record_info"
 
-        # Get zone owner project and user
-        local owner_project=$(get_zone_owner_project "$zone")
-        if [[ -z "$owner_project" ]]; then
-            print_warning "Zone owner not found, skipping CNAME record: $zone"
-            continue
-        fi
-
-        local username=$(get_project_username "$owner_project")
-        if [[ -z "$username" ]]; then
-            print_warning "User not found for project, skipping CNAME record: $owner_project"
-            continue
-        fi
-
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
         local record_fqdn="${name}.${zone}"
 
         if resource_exists "$existing_records" "$record_fqdn"; then
             count_skipped "recordsets"
         else
-            # Get password and create authorization token for this project and user
-            local user_password=$(get_project_user_password "$owner_project")
-            $os token issue --os-remote-project-name "$owner_project" --os-user "$username" >/dev/null 2>&1
-
-            if OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" OS_PASSWORD="$user_password" $os recordset create --type CNAME --record "$target" "$zone" "$name" >/dev/null 2>&1; then
+            if $os recordset create --type CNAME --record "$target" "$zone" "$name" >/dev/null 2>&1; then
                 print_success "Created CNAME record: $record_fqdn -> $target"
                 count_created "recordsets"
             else
@@ -467,19 +377,6 @@ create_mx_records() {
     for record_info in "${MX_RECORDS[@]}"; do
         IFS=':' read -r zone pri1 host1 pri2 host2 <<< "$record_info"
 
-        # Get zone owner project and user
-        local owner_project=$(get_zone_owner_project "$zone")
-        if [[ -z "$owner_project" ]]; then
-            print_warning "Zone owner not found, skipping MX record: $zone"
-            continue
-        fi
-
-        local username=$(get_project_username "$owner_project")
-        if [[ -z "$username" ]]; then
-            print_warning "User not found for project, skipping MX record: $owner_project"
-            continue
-        fi
-
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
 
         # MX records use @ for the zone apex
@@ -490,11 +387,7 @@ create_mx_records() {
             [[ -n "$pri1" && -n "$host1" ]] && record_args="$record_args --record \"$pri1 $host1\""
             [[ -n "$pri2" && -n "$host2" ]] && record_args="$record_args --record \"$pri2 $host2\""
 
-            # Get password and create authorization token for this project and user
-            local user_password=$(get_project_user_password "$owner_project")
-            $os token issue --os-remote-project-name "$owner_project" --os-user "$username" >/dev/null 2>&1
-
-            if eval OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" OS_PASSWORD="$user_password" $os recordset create $record_args "$zone" @ >/dev/null 2>&1; then
+            if eval $os recordset create $record_args "$zone" @ >/dev/null 2>&1; then
                 print_success "Created MX record for: $zone"
                 count_created "recordsets"
             else
@@ -508,19 +401,6 @@ create_txt_records() {
     for record_info in "${TXT_RECORDS[@]}"; do
         IFS=':' read -r zone name value <<< "$record_info"
 
-        # Get zone owner project and user
-        local owner_project=$(get_zone_owner_project "$zone")
-        if [[ -z "$owner_project" ]]; then
-            print_warning "Zone owner not found, skipping TXT record: $zone"
-            continue
-        fi
-
-        local username=$(get_project_username "$owner_project")
-        if [[ -z "$username" ]]; then
-            print_warning "User not found for project, skipping TXT record: $owner_project"
-            continue
-        fi
-
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
         local record_fqdn
         if [[ "$name" == "@" ]]; then
@@ -532,11 +412,7 @@ create_txt_records() {
         if resource_exists "$existing_records" "$record_fqdn"; then
             count_skipped "recordsets"
         else
-            # Get password and create authorization token for this project and user
-            local user_password=$(get_project_user_password "$owner_project")
-            $os token issue --os-remote-project-name "$owner_project" --os-user "$username" >/dev/null 2>&1
-
-            if OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" OS_PASSWORD="$user_password" $os recordset create --type TXT --record "\"$value\"" "$zone" "$name" >/dev/null 2>&1; then
+            if $os recordset create --type TXT --record "\"$value\"" "$zone" "$name" >/dev/null 2>&1; then
                 print_success "Created TXT record: $record_fqdn"
                 count_created "recordsets"
             else
@@ -550,19 +426,6 @@ create_srv_records() {
     for record_info in "${SRV_RECORDS[@]}"; do
         IFS=':' read -r zone name priority weight port target <<< "$record_info"
 
-        # Get zone owner project and user
-        local owner_project=$(get_zone_owner_project "$zone")
-        if [[ -z "$owner_project" ]]; then
-            print_warning "Zone owner not found, skipping SRV record: $zone"
-            continue
-        fi
-
-        local username=$(get_project_username "$owner_project")
-        if [[ -z "$username" ]]; then
-            print_warning "User not found for project, skipping SRV record: $owner_project"
-            continue
-        fi
-
         local existing_records=$($os recordset list "$zone" -c name -f value 2>/dev/null || echo "")
         local record_fqdn="${name}.${zone}"
 
@@ -571,11 +434,7 @@ create_srv_records() {
         else
             local srv_value="$priority $weight $port $target"
 
-            # Get password and create authorization token for this project and user
-            local user_password=$(get_project_user_password "$owner_project")
-            $os token issue --os-remote-project-name "$owner_project" --os-user "$username" >/dev/null 2>&1
-
-            if OS_PROJECT_NAME="$owner_project" OS_USERNAME="$username" OS_PASSWORD="$user_password" $os recordset create --type SRV --record "$srv_value" "$zone" "$name" >/dev/null 2>&1; then
+            if $os recordset create --type SRV --record "$srv_value" "$zone" "$name" >/dev/null 2>&1; then
                 print_success "Created SRV record: $record_fqdn"
                 count_created "recordsets"
             else
