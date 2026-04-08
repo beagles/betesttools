@@ -6,12 +6,16 @@ with optional TLS for both modes.
 """
 
 import argparse
+import logging
 import sys
 import time
 
 import redis
 from redis.sentinel import Sentinel
 
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger('redis')
+logger.setLevel(logging.DEBUG)
 
 def build_ssl_kwargs(args):
     """Build SSL keyword arguments from CLI options."""
@@ -25,7 +29,7 @@ def build_ssl_kwargs(args):
     if args.client_key:
         kwargs["ssl_keyfile"] = args.client_key
     if args.skip_verify:
-        kwargs["ssl_cert_reqs"] = "none"
+        kwargs["ssl_cert_reqs"] = None
     return kwargs
 
 
@@ -66,7 +70,7 @@ def connect_sentinel(args):
         if args.client_key:
             sentinel_ssl_kwargs["ssl_keyfile"] = args.client_key
         if args.skip_verify:
-            sentinel_ssl_kwargs["ssl_cert_reqs"] = "none"
+            sentinel_ssl_kwargs["ssl_cert_reqs"] = None
 
     sentinel = Sentinel(
         sentinels,
